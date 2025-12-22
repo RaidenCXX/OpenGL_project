@@ -1,0 +1,14 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 60
+
+BraceWrapping:
+  AfterOpeningBrace: true
+  BeforeClosingBrace: true
+
+BinPackArguments: false
+BinPackParameters: false
+
+Cpp11BracedListStyle: false
+
+AlignArrayOfStructures: Left

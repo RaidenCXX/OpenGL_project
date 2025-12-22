@@ -1,0 +1,32 @@
+[
+{
+  "directory": "/home/raiden/Projects/Stady/learnOpenGL/build",
+  "command": "/usr/bin/c++  -I/home/raiden/Projects/Stady/learnOpenGL/deps/include -I/home/raiden/Projects/Stady/learnOpenGL/source -std=gnu++17 -o CMakeFiles/lernOpenGL.dir/source/main.cpp.o -c /home/raiden/Projects/Stady/learnOpenGL/source/main.cpp",
+  "file": "/home/raiden/Projects/Stady/learnOpenGL/source/main.cpp",
+  "output": "CMakeFiles/lernOpenGL.dir/source/main.cpp.o"
+},
+{
+  "directory": "/home/raiden/Projects/Stady/learnOpenGL/build",
+  "command": "/usr/bin/c++  -I/home/raiden/Projects/Stady/learnOpenGL/deps/include -I/home/raiden/Projects/Stady/learnOpenGL/source -std=gnu++17 -o CMakeFiles/lernOpenGL.dir/source/shader.cpp.o -c /home/raiden/Projects/Stady/learnOpenGL/source/shader.cpp",
+  "file": "/home/raiden/Projects/Stady/learnOpenGL/source/shader.cpp",
+  "output": "CMakeFiles/lernOpenGL.dir/source/shader.cpp.o"
+},
+{
+  "directory": "/home/raiden/Projects/Stady/learnOpenGL/build",
+  "command": "/usr/bin/c++  -I/home/raiden/Projects/Stady/learnOpenGL/deps/include -I/home/raiden/Projects/Stady/learnOpenGL/source -std=gnu++17 -o CMakeFiles/lernOpenGL.dir/source/stb_image.cpp.o -c /home/raiden/Projects/Stady/learnOpenGL/source/stb_image.cpp",
+  "file": "/home/raiden/Projects/Stady/learnOpenGL/source/stb_image.cpp",
+  "output": "CMakeFiles/lernOpenGL.dir/source/stb_image.cpp.o"
+},
+{
+  "directory": "/home/raiden/Projects/Stady/learnOpenGL/build",
+  "command": "/usr/bin/c++  -I/home/raiden/Projects/Stady/learnOpenGL/deps/include -I/home/raiden/Projects/Stady/learnOpenGL/source -std=gnu++17 -o CMakeFiles/lernOpenGL.dir/source/camera.cpp.o -c /home/raiden/Projects/Stady/learnOpenGL/source/camera.cpp",
+  "file": "/home/raiden/Projects/Stady/learnOpenGL/source/camera.cpp",
+  "output": "CMakeFiles/lernOpenGL.dir/source/camera.cpp.o"
+},
+{
+  "directory": "/home/raiden/Projects/Stady/learnOpenGL/build",
+  "command": "/usr/bin/c++  -I/home/raiden/Projects/Stady/learnOpenGL/deps/include -I/home/raiden/Projects/Stady/learnOpenGL/source -std=gnu++17 -o CMakeFiles/lernOpenGL.dir/source/system.cpp.o -c /home/raiden/Projects/Stady/learnOpenGL/source/system.cpp",
+  "file": "/home/raiden/Projects/Stady/learnOpenGL/source/system.cpp",
+  "output": "CMakeFiles/lernOpenGL.dir/source/system.cpp.o"
+}
+]
