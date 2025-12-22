@@ -1,3 +1,0 @@
-/home/raiden/Projects/Stady/learnOpenGL/build/CMakeFiles/lernOpenGL.dir
-/home/raiden/Projects/Stady/learnOpenGL/build/CMakeFiles/edit_cache.dir
-/home/raiden/Projects/Stady/learnOpenGL/build/CMakeFiles/rebuild_cache.dir
