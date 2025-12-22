@@ -1,3 +1,4 @@
 
-//Folder
+#Folder
 build/
+.cache/clangd/index/
