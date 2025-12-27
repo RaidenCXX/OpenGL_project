@@ -19,6 +19,7 @@ add_executable(${PROJECT_NAME}
   source/stb_image.cpp
   source/camera.cpp
   source/system.cpp
+  source/model.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

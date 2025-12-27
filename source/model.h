@@ -43,8 +43,10 @@ private:
 
 class Model {
 public:
-  Model(char *path);
+  Model(const char *path, bool flipTexture = false, bool gamma = false);
   void Draw(Shader &shader);
+
+  const std::vector<Texture> &getTextures() const { return m_textures_loaded; }
 
 private:
   // model data
@@ -52,11 +54,13 @@ private:
   std::vector<Mesh> m_meshes;
   std::string m_directory;
 
+  // model setting
+  bool m_flipTexture;
+
   void loadModel(const std::string &path);
   void processNode(aiNode *node, const aiScene *scene);
   Mesh processMesh(aiMesh *mesh, const aiScene *scene);
-  std::vector<Texture> loadMaterialTexture(aiMaterial *mat, aiTextureType type,
-                                           const std::string &typeName);
+  std::vector<Texture> loadMaterialTexture(aiMaterial *mat, aiTextureType type);
   unsigned int TextureFromFile(const char *path, const std::string &directory,
                                bool gamma = true);
 };

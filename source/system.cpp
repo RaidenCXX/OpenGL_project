@@ -2,7 +2,8 @@
 #include "glfw/glfw3.h"
 
 System::System(const std::string &name, GLuint width, GLuint height)
-    : m_Time(glfwGetTime()), m_DeltaTime(0.0f), m_LastFrame(0.0f) {
+    : m_Time(glfwGetTime()), m_DeltaTime(0.0f), m_LastFrame(0.0f),
+      m_Width(width), m_Height(height) {
   m_Window = glfwCreateWindow(width, height, name.c_str(), NULL, NULL);
 }
 

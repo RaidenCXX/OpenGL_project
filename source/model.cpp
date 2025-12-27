@@ -16,7 +16,9 @@
 
 Mesh::Mesh(std::vector<Vertex> &vertices, std::vector<GLuint> &indices,
            std::vector<Texture> &texture)
-    : m_vertices(vertices), m_indices(indices), m_textures(texture) {}
+    : m_vertices(vertices), m_indices(indices), m_textures(texture) {
+  setupMesh();
+}
 
 void Mesh::setupMesh() {
 
@@ -43,7 +45,7 @@ void Mesh::setupMesh() {
   glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void *)offsetof(Vertex, Normal));
 
-  // vertex normals
+  // vertex tex TexCoords
   glEnableVertexAttribArray(2);
   glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void *)offsetof(Vertex, TexCoords));
@@ -63,21 +65,31 @@ void Mesh::Draw(Shader &shader) {
 
     if (type == TextureType::Diffuse) {
       number = std::to_string(diffuseNr++);
-      name = "texture_diffuse" + number;
+      name = "material.texture_diffuse1";
     } else if (type == TextureType::Specular) {
       number = std::to_string(specularNr++);
-      name = "texture_specular" + number;
+      name = "material.texture_specular1";
     }
 
-    shader.setBool(("material." + name).c_str(), i);
+    shader.setInt(name.c_str(), i);
     glBindTexture(GL_TEXTURE_2D, m_textures[i].id);
   }
-  glActiveTexture(GL_TEXTURE0);
+  shader.setFloat("material.shininess", 32.f);
+  shader.setFloat("pointLight.constant", 1.0f);
+  shader.setFloat("pointLight.linear", 0.14f);
+  shader.setFloat("pointLight.quadratic", 0.07f);
 
   // draw mesh
   glBindVertexArray(m_VAO);
   glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
   glBindVertexArray(0);
+
+  glActiveTexture(GL_TEXTURE0);
+}
+
+Model::Model(const char *path, bool flipTexture, bool gamma)
+    : m_flipTexture(flipTexture) {
+  loadModel(path);
 }
 
 void Model::Draw(Shader &shader) {
@@ -87,17 +99,21 @@ void Model::Draw(Shader &shader) {
 
 void Model::loadModel(const std::string &path) {
   Assimp::Importer import;
+
   const aiScene *scene =
-      import.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+      import.ReadFile(path, aiProcess_Triangulate | aiProcess_GenNormals);
 
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
       !scene->mRootNode) {
     std::cout << "ERROR::ASSIMP::" << import.GetErrorString() << std::endl;
     return;
-  }
+  } else
+    std::cout << "ASSIMP READ FILE: " << path << std::endl;
 
   m_directory = path.substr(0, path.find_last_of('/'));
   processNode(scene->mRootNode, scene);
+
+  std::cout << "Meshes count: " << m_meshes.size() << std::endl;
 }
 
 void Model::processNode(aiNode *node, const aiScene *scene) {
@@ -124,7 +140,6 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
     vertex.Position.x = mesh->mVertices[i].x;
     vertex.Position.y = mesh->mVertices[i].y;
     vertex.Position.z = mesh->mVertices[i].z;
-    vertices.push_back(vertex);
 
     if (mesh->HasNormals()) {
       vertex.Normal.x = mesh->mNormals[i].x;
@@ -138,57 +153,63 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
     } else
       vertex.TexCoords = glm::vec2(0.0f, 0.0f);
 
-    for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {
-      aiFace face = mesh->mFaces[i];
-      for (unsigned int j = 0; j < face.mNumIndices; ++j) {
-        indices.push_back(face.mIndices[j]);
-      }
-    }
-
-    if (mesh->mMaterialIndex >= 0) {
-      aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
-
-      std::vector<Texture> diffuseMaps = loadMaterialTexture(
-          material, aiTextureType_DIFFUSE, "texture_diffuse");
-      textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-      std::vector<Texture> specularMaps = loadMaterialTexture(
-          material, aiTextureType_SPECULAR, "texture_specular");
-      textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
-    }
+    vertices.push_back(vertex);
   }
+
+  for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {
+    aiFace face = mesh->mFaces[i];
+    for (unsigned int j = 0; j < face.mNumIndices; ++j)
+      indices.push_back(face.mIndices[j]);
+  }
+
+  if (mesh->mMaterialIndex >= 0) {
+    aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
+
+    std::vector<Texture> diffuseMaps =
+        loadMaterialTexture(material, aiTextureType_DIFFUSE);
+    textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+    std::vector<Texture> specularMaps =
+        loadMaterialTexture(material, aiTextureType_SPECULAR);
+    textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+  }
+
   return Mesh(vertices, indices, textures);
 }
 
 std::vector<Texture> Model::loadMaterialTexture(aiMaterial *mat,
-                                                aiTextureType type,
-                                                const std::string &typeName) {
+                                                aiTextureType type) {
   std::vector<Texture> textures;
   for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
     aiString str;
     mat->GetTexture(type, i, &str);
-    // check if texture was loaded before and if so, continue to next iteration:
-    // skip loading a new texture
+
     bool skip = false;
     for (unsigned int j = 0; j < m_textures_loaded.size(); j++) {
       if (std::strcmp(m_textures_loaded[j].path.data(), str.C_Str()) == 0) {
         textures.push_back(m_textures_loaded[j]);
         skip = true; // a texture with the same filepath has already been
-                     // loaded, continue to next one. (optimization)
         break;
       }
     }
     if (!skip) { // if texture hasn't been loaded already, load it
       Texture texture;
       texture.id = TextureFromFile(str.C_Str(), this->m_directory);
-      if (typeName == "diffuse")
+
+      switch (type) {
+      case aiTextureType_DIFFUSE:
         texture.type = TextureType::Diffuse;
-      else if (typeName == "specular")
+        break;
+      case aiTextureType_SPECULAR:
         texture.type = TextureType::Specular;
+        break;
+      default:
+        break;
+      }
+
       texture.path = str.C_Str();
       textures.push_back(texture);
       m_textures_loaded.push_back(
           texture); // store it as texture loaded for entire model, to ensure we
-                    // won't unnecessary load duplicate textures.
     }
   }
   return textures;
@@ -199,9 +220,12 @@ unsigned int Model::TextureFromFile(const char *path,
   std::string filename = path;
   filename = directory + '/' + filename;
 
+  std::cout << "Texture path: " << filename << std::endl;
+
   unsigned int textureID;
   glGenTextures(1, &textureID);
 
+  stbi_set_flip_vertically_on_load(m_flipTexture);
   int width, height, nrComponents;
   unsigned char *data =
       stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
