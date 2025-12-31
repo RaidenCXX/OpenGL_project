@@ -39,6 +39,8 @@ private:
 
   void updateView();
 
+  bool m_depthMode = false;
+
 public:
   Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f),
          glm::vec3 target = glm::vec3(0.0f, 0.0f, 1.0f),
@@ -49,12 +51,15 @@ public:
   void setUp(const glm::vec3 &up);
   void setCameraSpeed(const float speed) { m_CameraSpeed = speed; }
 
+  void enableDepthMode() { m_depthMode = true; }
+  void disableDepthMode() { m_depthMode = false; }
+  bool getDepthModeStatus() { return m_depthMode; }
+
   const glm::vec3 &getPosition() const { return m_Position; }
   const glm::vec3 &getFront() const { return m_Front; }
   const glm::vec3 &getUp() const { return m_Up; }
   const glm::mat4 getView();
   const float getCameraSpeed() const { return m_CameraSpeed; }
-
   static void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
     Camera *cam = static_cast<Camera *>(glfwGetWindowUserPointer(window));
     if (cam)

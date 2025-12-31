@@ -34,7 +34,7 @@ public:
 
   Mesh(std::vector<Vertex> &vertices, std::vector<GLuint> &indices,
        std::vector<Texture> &texture);
-  void Draw(Shader &shader);
+  void Draw(Shader &shader, bool drawTexture);
 
 private:
   GLuint m_VAO, m_VBO, m_EBO;
@@ -44,7 +44,7 @@ private:
 class Model {
 public:
   Model(const char *path, bool flipTexture = false, bool gamma = false);
-  void Draw(Shader &shader);
+  void Draw(Shader &shader, bool drawTexture = true);
 
   const std::vector<Texture> &getTextures() const { return m_textures_loaded; }
 

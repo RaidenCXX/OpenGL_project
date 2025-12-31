@@ -53,38 +53,39 @@ void Mesh::setupMesh() {
   glBindVertexArray(0);
 }
 
-void Mesh::Draw(Shader &shader) {
-  GLuint diffuseNr = 1;
-  GLuint specularNr = 1;
-  for (GLuint i = 0; i < m_textures.size(); ++i) {
-    glActiveTexture(GL_TEXTURE0 + i);
+void Mesh::Draw(Shader &shader, bool drawTexture) {
+  if (drawTexture) {
+    GLuint diffuseNr = 1;
+    GLuint specularNr = 1;
+    for (GLuint i = 0; i < m_textures.size(); ++i) {
+      glActiveTexture(GL_TEXTURE0 + i);
 
-    TextureType type = m_textures[i].type;
-    std::string number;
-    std::string name;
+      TextureType type = m_textures[i].type;
+      std::string number;
+      std::string name;
 
-    if (type == TextureType::Diffuse) {
-      number = std::to_string(diffuseNr++);
-      name = "material.texture_diffuse1";
-    } else if (type == TextureType::Specular) {
-      number = std::to_string(specularNr++);
-      name = "material.texture_specular1";
+      if (type == TextureType::Diffuse) {
+        number = std::to_string(diffuseNr++);
+        name = "material.texture_diffuse1";
+      } else if (type == TextureType::Specular) {
+        number = std::to_string(specularNr++);
+        name = "material.texture_specular1";
+      }
+
+      shader.setInt(name.c_str(), i);
+      glBindTexture(GL_TEXTURE_2D, m_textures[i].id);
     }
-
-    shader.setInt(name.c_str(), i);
-    glBindTexture(GL_TEXTURE_2D, m_textures[i].id);
+    shader.setFloat("material.shininess", 32.f);
+    shader.setFloat("pointLight.constant", 1.0f);
+    shader.setFloat("pointLight.linear", 0.14f);
+    shader.setFloat("pointLight.quadratic", 0.07f);
   }
-  shader.setFloat("material.shininess", 32.f);
-  shader.setFloat("pointLight.constant", 1.0f);
-  shader.setFloat("pointLight.linear", 0.14f);
-  shader.setFloat("pointLight.quadratic", 0.07f);
-
   // draw mesh
   glBindVertexArray(m_VAO);
   glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
   glBindVertexArray(0);
 
-  glActiveTexture(GL_TEXTURE0);
+  // glActiveTexture(GL_TEXTURE0);
 }
 
 Model::Model(const char *path, bool flipTexture, bool gamma)
@@ -92,9 +93,9 @@ Model::Model(const char *path, bool flipTexture, bool gamma)
   loadModel(path);
 }
 
-void Model::Draw(Shader &shader) {
+void Model::Draw(Shader &shader, bool drawTexture) {
   for (GLuint i = 0; i < m_meshes.size(); i++)
-    m_meshes[i].Draw(shader);
+    m_meshes[i].Draw(shader, drawTexture);
 }
 
 void Model::loadModel(const std::string &path) {
