@@ -66,10 +66,10 @@ void Mesh::Draw(Shader &shader, bool drawTexture) {
 
       if (type == TextureType::Diffuse) {
         number = std::to_string(diffuseNr++);
-        name = "material.texture_diffuse1";
+        name = "material.texture_diffuse" + number;
       } else if (type == TextureType::Specular) {
         number = std::to_string(specularNr++);
-        name = "material.texture_specular1";
+        name = "material.texture_specular" + number;
       }
 
       shader.setInt(name.c_str(), i);
@@ -232,12 +232,16 @@ unsigned int Model::TextureFromFile(const char *path,
       stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
   if (data) {
     GLenum format;
-    if (nrComponents == 1)
+    if (nrComponents == 1) {
       format = GL_RED;
-    else if (nrComponents == 3)
+      std::cout << "Format: GL_RED" << std::endl;
+    } else if (nrComponents == 3) {
       format = GL_RGB;
-    else if (nrComponents == 4)
+      std::cout << "Format: GL_RGB" << std::endl;
+    } else if (nrComponents == 4) {
       format = GL_RGBA;
+      std::cout << "Format: GL_RGBA" << std::endl;
+    }
 
     glBindTexture(GL_TEXTURE_2D, textureID);
     glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format,

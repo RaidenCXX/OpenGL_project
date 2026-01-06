@@ -4,7 +4,8 @@
 #include "glm/geometric.hpp"
 
 Camera::Camera(glm::vec3 position, glm::vec3 target, glm::vec3 up)
-    : m_Position(position), m_Front(target - position), m_Up(up) {
+    : m_Position(position), m_Front(target - position), m_Up(up), m_Yaw(-90.f),
+      m_Pitch(0.f) {
   updateView();
 }
 

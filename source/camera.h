@@ -60,11 +60,6 @@ public:
   const glm::vec3 &getUp() const { return m_Up; }
   const glm::mat4 getView();
   const float getCameraSpeed() const { return m_CameraSpeed; }
-  static void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
-    Camera *cam = static_cast<Camera *>(glfwGetWindowUserPointer(window));
-    if (cam)
-      cam->process_mouse(xpos, ypos);
-  }
 
   void process_mouse(double xpos, double ypos);
 };

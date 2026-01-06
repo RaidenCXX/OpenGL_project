@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 
+#include "enums.h"
 #include "glew/glew.h"
 #include "glfw/glfw3.h"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -18,12 +19,154 @@
 #include "system.h"
 
 #include <cstddef>
+#include <map>
 #include <string>
+#include <vector>
 
 #include "stb/stb_image.h"
 
-void framebuffer_size_callback(GLFWwindow *window, GLint width, GLint height) {
-  glViewport(0, 0, width, height);
+struct OffscreenFBO {
+  GLuint fbo = 0;
+  GLuint colorTex = 0;
+  GLuint rbo = 0;
+  int w = 0;
+  int h = 0;
+};
+
+void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
+  System *app = static_cast<System *>(glfwGetWindowUserPointer(window));
+
+  if (!app)
+    return;
+
+  std::cout << "Framebufer callback: Old size = " << app->m_FbWidth << ", "
+            << app->m_FbHight << ". New size = " << width << ", " << height
+            << "." << std::endl;
+
+  app->m_FbWidth = width;
+  app->m_FbHight = height;
+}
+
+void window_size_callback(GLFWwindow *window, int width, int height) {
+  System *app = static_cast<System *>(glfwGetWindowUserPointer(window));
+  if (!app)
+    return;
+  app->m_Width = width;
+  app->m_Height = height;
+}
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+  System *App = static_cast<System *>(glfwGetWindowUserPointer(window));
+  if (!App)
+    return;
+  App->m_Camera.process_mouse(xpos, ypos);
+}
+
+static void destroyFBO(OffscreenFBO &framebufer) {
+  if (framebufer.rbo)
+    glDeleteRenderbuffers(1, &framebufer.rbo);
+  if (framebufer.colorTex)
+    glDeleteTextures(1, &framebufer.colorTex);
+  if (framebufer.fbo)
+    glDeleteFramebuffers(1, &framebufer.fbo);
+  framebufer = OffscreenFBO{};
+}
+
+static void createFramebuffer(System &App, OffscreenFBO &framebufer) {
+  if (App.m_FbWidth <= 0 || App.m_FbHight <= 0)
+    return;
+
+  if (framebufer.fbo && framebufer.w == App.m_FbWidth &&
+      framebufer.h == App.m_FbHight)
+    return;
+
+  destroyFBO(framebufer);
+
+  framebufer.w = App.m_FbWidth;
+  framebufer.h = App.m_FbHight;
+
+  glGenFramebuffers(1, &framebufer.fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, framebufer.fbo);
+
+  glGenTextures(1, &framebufer.colorTex);
+  glBindTexture(GL_TEXTURE_2D, framebufer.colorTex);
+
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, App.m_FbWidth, App.m_FbHight, 0,
+               GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         framebufer.colorTex, 0);
+
+  glGenRenderbuffers(1, &framebufer.rbo);
+  glBindRenderbuffer(GL_RENDERBUFFER, framebufer.rbo);
+
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, App.m_FbWidth,
+                        App.m_FbHight);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                            GL_RENDERBUFFER, framebufer.rbo);
+
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    std::cout << "ERROR::FRAMEBUFFER:: framebuffer is not complete!"
+              << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return;
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void drawQuad(Shader &shader, OffscreenFBO framebufer) {
+
+  static GLuint VAO = 0, VBO = 0;
+  if (VAO == 0) {
+
+    float quadVertices[] = {
+        -1.0f, 1.0f,  0.0f, 1.0f, //
+        -1.0f, -1.0f, 0.0f, 0.0f, //
+        1.0f,  -1.0f, 1.0f, 0.0f, //
+
+        -1.0f, 1.0f,  0.0f, 1.0f, //
+        1.0f,  -1.0f, 1.0f, 0.0f, //
+        1.0f,  1.0f,  1.0f, 1.0f  //
+    };
+
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+
+    GLuint VBO;
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices,
+                 GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                          (void *)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                          (void *)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+  }
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, framebufer.w, framebufer.h);
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_STENCIL_TEST);
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, framebufer.colorTex);
+  shader.use();
+  shader.setInt("screenTexture", 0);
+
+  glBindVertexArray(VAO);
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+  glBindVertexArray(0);
+  glEnable(GL_DEPTH_TEST);
+
+  glEnable(GL_DEPTH_TEST);
+  glEnable(GL_STENCIL_TEST);
 }
 
 void processInput(System &system) {
@@ -61,8 +204,20 @@ void processInput(System &system) {
   if (glfwGetKey(system.m_Window, GLFW_KEY_F) == GLFW_PRESS)
     camera.disableDepthMode();
 
-  glfwSetWindowUserPointer(system.m_Window, &camera);
-  glfwSetCursorPosCallback(system.m_Window, Camera::mouse_callback);
+  if (glfwGetKey(system.m_Window, GLFW_KEY_0) == GLFW_PRESS)
+    system.m_effectType = EffectType::NoEffect;
+  else if (glfwGetKey(system.m_Window, GLFW_KEY_1) == GLFW_PRESS)
+    system.m_effectType = EffectType::Inversion;
+  else if (glfwGetKey(system.m_Window, GLFW_KEY_2) == GLFW_PRESS)
+    system.m_effectType = EffectType::Grayscale;
+  else if (glfwGetKey(system.m_Window, GLFW_KEY_3) == GLFW_PRESS)
+    system.m_effectType = EffectType::Sharpen;
+  else if (glfwGetKey(system.m_Window, GLFW_KEY_4) == GLFW_PRESS)
+    system.m_effectType = EffectType::Blur;
+  else if (glfwGetKey(system.m_Window, GLFW_KEY_5) == GLFW_PRESS)
+    system.m_effectType = EffectType::Edge;
+
+  glfwSetCursorPosCallback(system.m_Window, mouse_callback);
 
   // Camera move *******************
 }
@@ -83,7 +238,6 @@ void setTexFilteringWrapping() {
 }
 
 glm::vec3 PointlightPosition{glm::vec3{0.5f, 2.0f, -1.0f}}; //
-//clang-format on
 
 int main() {
 
@@ -92,6 +246,7 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
   System App{"LearnOpenGL", 800, 800};
   App.setCamera(Camera(glm::vec3(0.0f, 0.0f, -4.0f),
@@ -113,49 +268,88 @@ int main() {
     return 1;
   }
 
+  glfwSetWindowUserPointer(App.m_Window, &App);
   glfwSetFramebufferSizeCallback(App.m_Window, framebuffer_size_callback);
+  glfwSetWindowSizeCallback(App.m_Window, window_size_callback);
 
+  Shader EdgeShader("edge");
+  Shader BlurShader("blur");
+  Shader SharpenShader("sharpen");
+  Shader GrayscaleShader("grayscale");
+  Shader InversShader("invers");
+  Shader ScreenShader("screen");
   Shader ObjectShader("object");
   Shader TestShader("test");
   Shader LightShader{"light"};
   Shader DepthShader{"depth"};
   Shader OutLine("outline");
+  Shader TranspShader("transparent");
+  Shader GlassShader("glass");
+  std::vector<glm::vec3> windowPos = {
+      glm::vec3(0.1f, 1.0f, 3.0f),  //
+      glm::vec3(-0.2f, 1.0f, 5.0f), //
+      glm::vec3(0.3f, 1.0f, 7.0f),  //
+      glm::vec3(-0.4f, 1.0f, 8.0f), //
+      glm::vec3(0.5f, 1.0f, 10.0f)  //
+  };
+
+  std::cout << "Backpack: start loadet" << std::endl;
   Model modelBackpack{"assets/backpack/backpack.obj"};
-  std::cout << "Texture count loaded: " << modelBackpack.getTextures().size()
-            << std::endl;
+  std::cout << "Backpack: end loadet" << std::endl;
+  std::cout << "Leaf: start loadet" << std::endl;
+  Model modelLeaf{"assets/leaf/leaf.obj"};
+  std::vector<glm::vec3> vegetationPos = {glm::vec3(-3.5f, 0.0f, -1.2f), //
+                                          glm::vec3(0.2f, 0.0f, 4.0f),   //
+                                          glm::vec3(0.0f, 0.0f, 6.1f),   //
+                                          glm::vec3(-0.9f, 0.0f, -6.9)}; //
+
+  Model modelWindow{"assets/window/window.obj"};
 
   glBindVertexArray(0);
 
   // Projection matrix
   glm::mat4 projection;
-  float aspect = (float)App.m_Width / (float)App.m_Height;
-  projection = glm::perspective(glm::radians(45.f), aspect, 0.1f, 40.f);
+
+  // Sort distance window position
 
   // Depth properties
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_STENCIL_TEST);
   glDepthFunc(GL_LESS);
 
+  OffscreenFBO framebufer;
+
+  int windowW, windowH, framebuferW, framebuferH;
   while (!glfwWindowShouldClose(App.m_Window)) {
+
     App.update();
+    float aspect = (float)App.m_FbWidth / (float)App.m_FbHight;
+    projection = glm::perspective(glm::radians(45.f), aspect, 0.1f, 40.f);
+
+    // glfwGetWindowSize(App.m_Window, &windowW, &windowH);
+    // std::cout << "WindowSize: W = " << windowW << " ,H = " << windowH << ".";
+    // glfwGetFramebufferSize(App.m_Window, &framebuferW, &framebuferH);
+    // std::cout << "FramebuferSize: W = " << framebuferW
+    //           << " ,H = " << framebuferH << "." << std::endl;
 
     // input
     processInput(App);
 
+    // Creating a custom framebufer //////////////////////
+    createFramebuffer(App, framebufer);
+    // Creating a custom framebufer \\\\\\\\\\\\\\\\\\\\\\
+
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufer.fbo);
+    glViewport(0, 0, App.m_FbWidth, App.m_FbHight);
+    glEnable(GL_DEPTH_TEST);
+
     // Clear
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
     glm::mat4 model;
-
     model = glm::mat4{1.0f};
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-
-    // Matrix
-    DepthShader.setMat4("model", model);
-    DepthShader.setMat4("projection", projection);
-    DepthShader.setMat4("view", App.m_Camera.getView());
 
     if (!App.m_Camera.getDepthModeStatus()) {
 
@@ -213,9 +407,59 @@ int main() {
       OutLine.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
                                      App.m_Camera.getView() * model))));
       modelBackpack.Draw(OutLine);
+      glEnable(GL_DEPTH_TEST);
+      glStencilFunc(GL_ALWAYS, 1, 0x00);
+      // Leaf model ///////////////////////////////
+
+      TranspShader.use();
+      for (int i = 0; i < vegetationPos.size(); ++i) {
+        // Matrix
+        model = glm::mat4{1.0f};
+        model = glm::translate(model, vegetationPos[i]);
+        model =
+            glm::rotate(model, glm::radians(90.f), glm::vec3{1.0f, 0.0f, 0.0f});
+        model = glm::rotate(model, glm::radians(20.f * (i + 1)),
+                            glm::vec3{0.0f, 0.0f, 1.0f});
+        TranspShader.setMat4("projection", projection);
+        TranspShader.setMat4("view", App.m_Camera.getView());
+        TranspShader.setMat4("model", model);
+
+        modelLeaf.Draw(TranspShader);
+      }
+      //Leaf model \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+      // Window model /////////////////////////////
+      // Sort transparent window
+      std::map<float, glm::vec3> sorted;
+      for (unsigned int i = 0; i < windowPos.size(); ++i) {
+        float distance = glm::length(App.m_Camera.getPosition() - windowPos[i]);
+        sorted[distance] = windowPos[i];
+      }
+
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      glDepthMask(GL_FALSE);
+
+      GlassShader.use();
+      for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin();
+           it != sorted.rend(); ++it) {
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, it->second);
+        model = glm::rotate(model, glm::radians(90.f), glm::vec3(0, 1, 0));
+
+        GlassShader.setMat4("projection", projection);
+        GlassShader.setMat4("view", App.m_Camera.getView());
+        GlassShader.setMat4("model", model);
+
+        modelWindow.Draw(GlassShader);
+      }
+      glDepthMask(GL_TRUE);
+      glDisable(GL_BLEND);
+      //Window model \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
       glStencilMask(0xFF);
       glStencilFunc(GL_ALWAYS, 1, 0xFF);
-      glEnable(GL_DEPTH_TEST);
+
     } else {
       DepthShader.use();
       DepthShader.setFloat("near", 0.1f);
@@ -226,6 +470,31 @@ int main() {
       DepthShader.setMat4("projection", projection);
       DepthShader.setMat4("view", App.m_Camera.getView());
       modelBackpack.Draw(DepthShader, false);
+    }
+
+    if (!App.m_Camera.getDepthModeStatus()) {
+      switch (App.m_effectType) {
+      case EffectType::NoEffect:
+        drawQuad(ScreenShader, framebufer);
+        break;
+      case EffectType::Inversion:
+        drawQuad(InversShader, framebufer);
+        break;
+      case EffectType::Grayscale:
+        drawQuad(GrayscaleShader, framebufer);
+        break;
+      case EffectType::Sharpen:
+        drawQuad(SharpenShader, framebufer);
+        break;
+      case EffectType::Blur:
+        drawQuad(BlurShader, framebufer);
+        break;
+      case EffectType::Edge:
+        drawQuad(EdgeShader, framebufer);
+        break;
+      }
+    } else {
+      drawQuad(ScreenShader, framebufer);
     }
 
     // check and call events and swap the buffers

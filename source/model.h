@@ -47,6 +47,7 @@ public:
   void Draw(Shader &shader, bool drawTexture = true);
 
   const std::vector<Texture> &getTextures() const { return m_textures_loaded; }
+  const std::vector<Mesh> &getMeshes() const { return m_meshes; }
 
 private:
   // model data
@@ -56,6 +57,7 @@ private:
 
   // model setting
   bool m_flipTexture;
+  bool m_alpha;
 
   void loadModel(const std::string &path);
   void processNode(aiNode *node, const aiScene *scene);

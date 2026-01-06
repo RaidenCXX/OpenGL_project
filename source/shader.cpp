@@ -4,6 +4,8 @@
 #include <sstream>
 #include <string>
 
+// #define RELEASE
+
 Shader::Shader(const char *vertexShaderPath, const char *fragmentShaderPath) {
   std::string vertexCode;
   std::string fragmentCode;
@@ -164,13 +166,22 @@ Shader::Shader(const char *shaderName) {
 void Shader::use() const { glUseProgram(ID); }
 
 void Shader::setFloat(const std::string &name, float value) const {
-  glUniform1f(glGetUniformLocation(ID, name.c_str()), value);
+  GLint location = glGetUniformLocation(ID, name.c_str());
+  if (location == -1) {
+#ifdef RELEASE
+    std::cout << "Uniform float: " << name << " cant find" << std::endl;
+#endif // RELISE
+    return;
+  }
+  glUniform1f(location, value);
 }
 
 void Shader::setInt(const std::string &name, int value) const {
   GLint location = glGetUniformLocation(ID, name.c_str());
   if (location == -1) {
+#ifdef RELEASE
     std::cout << "Uniform int: " << name << " cant find" << std::endl;
+#endif // RELISE
     return;
   }
   glUniform1i(location, value);
@@ -179,7 +190,9 @@ void Shader::setInt(const std::string &name, int value) const {
 void Shader::setMat4(const std::string &name, glm::mat4 value) const {
   GLint location = glGetUniformLocation(ID, name.c_str());
   if (location == -1) {
+#ifdef RELEASE
     std::cout << "Uniform mat4: " << name << " cant find." << std::endl;
+#endif // RELISE
     return;
   }
   glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
@@ -188,7 +201,9 @@ void Shader::setMat4(const std::string &name, glm::mat4 value) const {
 void Shader::setMat3(const std::string &name, glm::mat3 value) const {
   GLint location = glGetUniformLocation(ID, name.c_str());
   if (location == -1) {
+#ifdef RELEASE
     std::cout << "Uniform mat3: " << name << " cant find." << std::endl;
+#endif // RELISE
     return;
   }
   glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(value));
@@ -197,7 +212,9 @@ void Shader::setMat3(const std::string &name, glm::mat3 value) const {
 void Shader::setVec3(const std::string &name, glm::vec3 value) const {
   GLint location = glGetUniformLocation(ID, name.c_str());
   if (location == -1) {
+#ifdef RELEASE
     std::cout << "Uniform vec3: " << name << " cant find." << std::endl;
+#endif // RELISE
     return;
   }
   glUniform3f(location, value.x, value.y, value.z);

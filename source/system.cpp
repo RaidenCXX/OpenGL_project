@@ -3,7 +3,7 @@
 
 System::System(const std::string &name, GLuint width, GLuint height)
     : m_Time(glfwGetTime()), m_DeltaTime(0.0f), m_LastFrame(0.0f),
-      m_Width(width), m_Height(height) {
+      m_Width(width), m_Height(height), m_FbWidth(width), m_FbHight(height) {
   m_Window = glfwCreateWindow(width, height, name.c_str(), NULL, NULL);
 }
 
