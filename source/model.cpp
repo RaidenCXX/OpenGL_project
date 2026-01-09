@@ -75,7 +75,7 @@ void Mesh::Draw(Shader &shader, bool drawTexture) {
       shader.setInt(name.c_str(), i);
       glBindTexture(GL_TEXTURE_2D, m_textures[i].id);
     }
-    shader.setFloat("material.shininess", 32.f);
+    shader.setFloat("material.shininess", 64.f);
     shader.setFloat("pointLight.constant", 1.0f);
     shader.setFloat("pointLight.linear", 0.14f);
     shader.setFloat("pointLight.quadratic", 0.07f);

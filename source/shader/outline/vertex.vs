@@ -13,7 +13,7 @@ void main()
   vec3 viewPos  = (view * model * vec4(aPos, 1.0)).xyz;
   vec3 viewNorm = normalize(inverse * aNormal);
 
-  float outlineThickness = 0.03;
+  float outlineThickness = 0.01;
   vec3 outlinedPos = viewPos + viewNorm * outlineThickness;
   gl_Position = projection * vec4(outlinedPos, 1.0);
 }

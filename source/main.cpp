@@ -5,6 +5,7 @@
 #include "enums.h"
 #include "glew/glew.h"
 #include "glfw/glfw3.h"
+#include "glm/detail/qualifier.hpp"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
@@ -17,6 +18,7 @@
 #include "model.h"
 #include "shader.h"
 #include "system.h"
+#include "utilities.h"
 
 #include <cstddef>
 #include <map>
@@ -272,6 +274,9 @@ int main() {
   glfwSetFramebufferSizeCallback(App.m_Window, framebuffer_size_callback);
   glfwSetWindowSizeCallback(App.m_Window, window_size_callback);
 
+  Shader RefractionShader("refraction");
+  Shader MirrorShader("mirror");
+  Shader CubeMapShader("cubemap");
   Shader EdgeShader("edge");
   Shader BlurShader("blur");
   Shader SharpenShader("sharpen");
@@ -293,9 +298,12 @@ int main() {
       glm::vec3(0.5f, 1.0f, 10.0f)  //
   };
 
-  std::cout << "Backpack: start loadet" << std::endl;
-  Model modelBackpack{"assets/backpack/backpack.obj"};
-  std::cout << "Backpack: end loadet" << std::endl;
+  std::cout << "Ball: start loadet" << std::endl;
+  Model modelBall{"assets/ball/ball.obj"};
+  std::cout << "Ball: end loadet" << std::endl;
+  std::cout << "Stand: start loadet" << std::endl;
+  Model modelStand{"assets/stand/stand.obj"};
+  std::cout << "Stand: end loadet" << std::endl;
   std::cout << "Leaf: start loadet" << std::endl;
   Model modelLeaf{"assets/leaf/leaf.obj"};
   std::vector<glm::vec3> vegetationPos = {glm::vec3(-3.5f, 0.0f, -1.2f), //
@@ -317,20 +325,21 @@ int main() {
   glEnable(GL_STENCIL_TEST);
   glDepthFunc(GL_LESS);
 
+  // Offscreen framebuffer
   OffscreenFBO framebufer;
 
-  int windowW, windowH, framebuferW, framebuferH;
+  // Load cubmap
+  GLuint CubemapTex = loadCubemap("LancellottiChapel");
+  GLuint CubemapVAO = createCubMapVAO();
+
+  glm::mat4 model;
   while (!glfwWindowShouldClose(App.m_Window)) {
+
+    float time = glfwGetTime();
 
     App.update();
     float aspect = (float)App.m_FbWidth / (float)App.m_FbHight;
     projection = glm::perspective(glm::radians(45.f), aspect, 0.1f, 40.f);
-
-    // glfwGetWindowSize(App.m_Window, &windowW, &windowH);
-    // std::cout << "WindowSize: W = " << windowW << " ,H = " << windowH << ".";
-    // glfwGetFramebufferSize(App.m_Window, &framebuferW, &framebuferH);
-    // std::cout << "FramebuferSize: W = " << framebuferW
-    //           << " ,H = " << framebuferH << "." << std::endl;
 
     // input
     processInput(App);
@@ -341,20 +350,23 @@ int main() {
 
     glBindFramebuffer(GL_FRAMEBUFFER, framebufer.fbo);
     glViewport(0, 0, App.m_FbWidth, App.m_FbHight);
-    glEnable(GL_DEPTH_TEST);
 
     // Clear
     glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
-    glm::mat4 model;
     model = glm::mat4{1.0f};
 
     if (!App.m_Camera.getDepthModeStatus()) {
 
-      glStencilFunc(GL_ALWAYS, 1, 0xFF);
+      // Ball model {
+      glEnable(GL_DEPTH_TEST);
+      glDepthMask(GL_TRUE);
+      glDepthFunc(GL_LESS);
+      glEnable(GL_STENCIL_TEST);
       glStencilMask(0xFF);
+      glStencilFunc(GL_ALWAYS, 1, 0xFF);
 
       ObjectShader.use();
       // Direction light properties
@@ -383,52 +395,171 @@ int main() {
       ObjectShader.setVec3("flashLight.direction",
                            glm::vec3(App.m_Camera.getView() *
                                      glm::vec4(App.m_Camera.getFront(), 0.0f)));
-      ObjectShader.setVec3("flashLight.diffuse", glm::vec3(0.3f, 0.7f, 0.3f));
-      ObjectShader.setVec3("flashLight.specular", glm::vec3(0.3f, 0.7f, 0.3f));
+      ObjectShader.setVec3("flashLight.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
+      ObjectShader.setVec3("flashLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
       ObjectShader.setFloat("flashLight.cutOff", cos(glm::radians(20.f)));
       ObjectShader.setFloat("flashLight.outerCutOff", cos(glm::radians(13.f)));
 
       // Matrix
+      model = glm::mat4(1.0f);
+      {
+        float angle = time * 7;
+        model = glm::rotate(model, glm::radians(angle),
+                            glm::vec3{0.0f, 1.0f, 0.0f});
+      }
       ObjectShader.setMat4("model", model);
       ObjectShader.setMat4("projection", projection);
       ObjectShader.setMat4("view", App.m_Camera.getView());
       ObjectShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
                                           App.m_Camera.getView() * model))));
-      modelBackpack.Draw(ObjectShader);
+      modelBall.Draw(ObjectShader);
+      // Ball model }
 
+      // Ball outLine model {
       glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
       glStencilMask(0x00);
-      glDisable(GL_DEPTH_TEST);
-      OutLine.use();
 
+      OutLine.use();
       OutLine.setMat4("model", model);
       OutLine.setMat4("projection", projection);
       OutLine.setMat4("view", App.m_Camera.getView());
       OutLine.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
                                      App.m_Camera.getView() * model))));
-      modelBackpack.Draw(OutLine);
+      modelBall.Draw(OutLine);
+
+      glEnable(GL_DEPTH_TEST);
+      glDepthMask(0xFF);
+      glDisable(GL_STENCIL_TEST);
+      // Ball outLine model }
+
+      // Stand model {
+      ObjectShader.use();
+      // Direction light properties
+      ObjectShader.setVec3("dirLight.direction",
+                           glm::vec3(App.m_Camera.getView() *
+                                     glm::vec4(0.0f, -1.0f, 0.0f, 0.0f)));
+      ObjectShader.setVec3("dirLight.ambient", glm::vec3(0.1f, 0.1f, 0.1f));
+      ObjectShader.setVec3("dirLight.diffuse", glm::vec3(0.3f, 0.3f, 0.3f));
+      ObjectShader.setVec3("dirLight.specular", glm::vec3(0.3f, 0.3f, 0.3f));
+
+      // Pointlight properties
+      ObjectShader.setVec3(
+          "pointLight.position",
+          glm::vec3(App.m_Camera.getView() *
+                    glm::vec4(glm::vec3(0.0f, 2.0f, 0.0f), 1.0f)));
+
+      ObjectShader.setVec3("pointLight.ambient", glm::vec3(0.1f, 0.1f, 0.1f));
+      ObjectShader.setVec3("pointLight.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
+      ObjectShader.setVec3("pointLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+
+      // Flash light properties
+      ObjectShader.setVec3(
+          "flashLight.position",
+          glm::vec3(App.m_Camera.getView() *
+                    glm::vec4(App.m_Camera.getPosition(), 1.0f)));
+      ObjectShader.setVec3("flashLight.direction",
+                           glm::vec3(App.m_Camera.getView() *
+                                     glm::vec4(App.m_Camera.getFront(), 0.0f)));
+      ObjectShader.setVec3("flashLight.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
+      ObjectShader.setVec3("flashLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+      ObjectShader.setFloat("flashLight.cutOff", cos(glm::radians(20.f)));
+      ObjectShader.setFloat("flashLight.outerCutOff", cos(glm::radians(13.f)));
+
+      // Matrix
+      model = glm::mat4(1.0f);
+      ObjectShader.setMat4("model", model);
+      ObjectShader.setMat4("projection", projection);
+      ObjectShader.setMat4("view", App.m_Camera.getView());
+      ObjectShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
+                                          App.m_Camera.getView() * model))));
+      modelStand.Draw(ObjectShader);
+
+      // Stand model }
+
+      // Leaf model {
       glEnable(GL_DEPTH_TEST);
       glStencilFunc(GL_ALWAYS, 1, 0x00);
-      // Leaf model ///////////////////////////////
 
       TranspShader.use();
       for (int i = 0; i < vegetationPos.size(); ++i) {
         // Matrix
         model = glm::mat4{1.0f};
         model = glm::translate(model, vegetationPos[i]);
-        model =
-            glm::rotate(model, glm::radians(90.f), glm::vec3{1.0f, 0.0f, 0.0f});
-        model = glm::rotate(model, glm::radians(20.f * (i + 1)),
-                            glm::vec3{0.0f, 0.0f, 1.0f});
+        {
+          float angle = time * 10;
+          model = glm::rotate(model, glm::radians(angle),
+                              glm::vec3{0.0f, 1.0f, 0.0f});
+          model = glm::rotate(model, glm::radians(90.f),
+                              glm::vec3{1.0f, 0.0f, 0.0f});
+        }
         TranspShader.setMat4("projection", projection);
         TranspShader.setMat4("view", App.m_Camera.getView());
         TranspShader.setMat4("model", model);
 
         modelLeaf.Draw(TranspShader);
       }
-      //Leaf model \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+      model = glm::mat4{1.0f};
+      // Leaf model }
 
-      // Window model /////////////////////////////
+      // Ball mirror model {
+      MirrorShader.use();
+
+      glBindTexture(GL_TEXTURE_CUBE_MAP, CubemapTex);
+
+      // Matrix
+      model = glm::mat4(1.0f);
+      {
+        model = glm::translate(model, glm::vec3{2.0f, 0.0f, 0.0f});
+        float angle = time * 7;
+        model = glm::rotate(model, glm::radians(angle),
+                            glm::vec3{0.0f, 1.0f, 0.0f});
+      }
+      MirrorShader.setMat4("model", model);
+      MirrorShader.setMat4("projection", projection);
+      MirrorShader.setMat4("view", App.m_Camera.getView());
+      MirrorShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
+                                          App.m_Camera.getView() * model))));
+      modelBall.Draw(MirrorShader, false);
+
+      // Ball mirror model }
+
+      // Ball diamond model {
+      RefractionShader.use();
+
+      glBindTexture(GL_TEXTURE_CUBE_MAP, CubemapTex);
+
+      // Matrix
+      model = glm::mat4(1.0f);
+      {
+        model = glm::translate(model, glm::vec3{-2.0f, 0.0f, 0.0f});
+        float angle = time * 7;
+        model = glm::rotate(model, glm::radians(angle),
+                            glm::vec3{0.0f, 1.0f, 0.0f});
+      }
+      RefractionShader.setFloat("ROI", 1.309f);
+      RefractionShader.setMat4("model", model);
+      RefractionShader.setMat4("projection", projection);
+      RefractionShader.setMat4("view", App.m_Camera.getView());
+      RefractionShader.setMat3(
+          "inverse", glm::mat3(glm::transpose(
+                         glm::inverse(App.m_Camera.getView() * model))));
+      modelBall.Draw(RefractionShader, false);
+
+      // Ball diamond model }
+
+      // Cubemap {
+      glDepthFunc(GL_LEQUAL);
+      CubeMapShader.use();
+      CubeMapShader.setMat4("view",
+                            glm::mat4(glm::mat3(App.m_Camera.getView())));
+      CubeMapShader.setMat4("projection", projection);
+      glBindVertexArray(CubemapVAO);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_CUBE_MAP, CubemapTex);
+      glDrawArrays(GL_TRIANGLES, 0, 36);
+      // Cubemap }
+
+      // Window model {
       // Sort transparent window
       std::map<float, glm::vec3> sorted;
       for (unsigned int i = 0; i < windowPos.size(); ++i) {
@@ -455,11 +586,12 @@ int main() {
       }
       glDepthMask(GL_TRUE);
       glDisable(GL_BLEND);
-      //Window model \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+      // Window model }
 
+      glDepthMask(GL_TRUE);
       glStencilMask(0xFF);
       glStencilFunc(GL_ALWAYS, 1, 0xFF);
-
+      glDepthFunc(GL_LESS);
     } else {
       DepthShader.use();
       DepthShader.setFloat("near", 0.1f);
@@ -469,7 +601,7 @@ int main() {
       DepthShader.setMat4("model", model);
       DepthShader.setMat4("projection", projection);
       DepthShader.setMat4("view", App.m_Camera.getView());
-      modelBackpack.Draw(DepthShader, false);
+      modelBall.Draw(DepthShader, false);
     }
 
     if (!App.m_Camera.getDepthModeStatus()) {
