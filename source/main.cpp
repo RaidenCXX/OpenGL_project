@@ -287,7 +287,7 @@ int main() {
   Shader TestShader("test");
   Shader LightShader{"light"};
   Shader DepthShader{"depth"};
-  Shader OutLine("outline");
+  Shader OutLineShader("outline");
   Shader TranspShader("transparent");
   Shader GlassShader("glass");
   std::vector<glm::vec3> windowPos = {
@@ -332,8 +332,21 @@ int main() {
   GLuint CubemapTex = loadCubemap("LancellottiChapel");
   GLuint CubemapVAO = createCubMapVAO();
 
+  GLuint matrixUbo = genUbo(sizeof(glm::mat4) * 2);
+  UboBlocBinding(matrixUbo, sizeof(glm::mat4) * 2, 0);
+
+  ShaderBlockBinding(matrixUbo, ObjectShader, "Matrices", 0);
+  ShaderBlockBinding(matrixUbo, OutLineShader, "Matrices", 0);
+  ShaderBlockBinding(matrixUbo, TranspShader, "Matrices", 0);
+  ShaderBlockBinding(matrixUbo, GlassShader, "Matrices", 0);
+  ShaderBlockBinding(matrixUbo, RefractionShader, "Matrices", 0);
+  ShaderBlockBinding(matrixUbo, MirrorShader, "Matrices", 0);
+
   glm::mat4 model;
   while (!glfwWindowShouldClose(App.m_Window)) {
+
+    updateUbo(matrixUbo, 0, projection);
+    updateUbo(matrixUbo, sizeof(glm::mat4), App.m_Camera.getView());
 
     float time = glfwGetTime();
 
@@ -408,8 +421,6 @@ int main() {
                             glm::vec3{0.0f, 1.0f, 0.0f});
       }
       ObjectShader.setMat4("model", model);
-      ObjectShader.setMat4("projection", projection);
-      ObjectShader.setMat4("view", App.m_Camera.getView());
       ObjectShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
                                           App.m_Camera.getView() * model))));
       modelBall.Draw(ObjectShader);
@@ -419,13 +430,11 @@ int main() {
       glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
       glStencilMask(0x00);
 
-      OutLine.use();
-      OutLine.setMat4("model", model);
-      OutLine.setMat4("projection", projection);
-      OutLine.setMat4("view", App.m_Camera.getView());
-      OutLine.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
-                                     App.m_Camera.getView() * model))));
-      modelBall.Draw(OutLine);
+      OutLineShader.use();
+      OutLineShader.setMat4("model", model);
+      OutLineShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
+                                           App.m_Camera.getView() * model))));
+      modelBall.Draw(OutLineShader);
 
       glEnable(GL_DEPTH_TEST);
       glDepthMask(0xFF);
@@ -468,8 +477,6 @@ int main() {
       // Matrix
       model = glm::mat4(1.0f);
       ObjectShader.setMat4("model", model);
-      ObjectShader.setMat4("projection", projection);
-      ObjectShader.setMat4("view", App.m_Camera.getView());
       ObjectShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
                                           App.m_Camera.getView() * model))));
       modelStand.Draw(ObjectShader);
@@ -492,8 +499,6 @@ int main() {
           model = glm::rotate(model, glm::radians(90.f),
                               glm::vec3{1.0f, 0.0f, 0.0f});
         }
-        TranspShader.setMat4("projection", projection);
-        TranspShader.setMat4("view", App.m_Camera.getView());
         TranspShader.setMat4("model", model);
 
         modelLeaf.Draw(TranspShader);
@@ -515,8 +520,6 @@ int main() {
                             glm::vec3{0.0f, 1.0f, 0.0f});
       }
       MirrorShader.setMat4("model", model);
-      MirrorShader.setMat4("projection", projection);
-      MirrorShader.setMat4("view", App.m_Camera.getView());
       MirrorShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
                                           App.m_Camera.getView() * model))));
       modelBall.Draw(MirrorShader, false);
@@ -538,8 +541,6 @@ int main() {
       }
       RefractionShader.setFloat("ROI", 1.309f);
       RefractionShader.setMat4("model", model);
-      RefractionShader.setMat4("projection", projection);
-      RefractionShader.setMat4("view", App.m_Camera.getView());
       RefractionShader.setMat3(
           "inverse", glm::mat3(glm::transpose(
                          glm::inverse(App.m_Camera.getView() * model))));
@@ -578,8 +579,6 @@ int main() {
         model = glm::translate(model, it->second);
         model = glm::rotate(model, glm::radians(90.f), glm::vec3(0, 1, 0));
 
-        GlassShader.setMat4("projection", projection);
-        GlassShader.setMat4("view", App.m_Camera.getView());
         GlassShader.setMat4("model", model);
 
         modelWindow.Draw(GlassShader);

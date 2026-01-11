@@ -1,8 +1,9 @@
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "glm/ext/vector_float3.hpp"
+#include "shader.h"
 #include "stb/stb_image.h"
 #include "utilities.h"
 
@@ -106,4 +107,30 @@ GLuint createCubMapVAO() {
 
   glBindVertexArray(0);
   return VAO;
+}
+
+void ShaderBlockBinding(GLuint UBO, const Shader &shader,
+                        const std::string &blockName, GLuint bindingPoint) {
+  GLuint blocIndex = glGetUniformBlockIndex(shader.ID, blockName.c_str());
+  if (blocIndex == GL_INVALID_INDEX) {
+    std::cout << "SHADER BLOCK BINDING: INVALID INDEX: " << blockName
+              << std::endl;
+    return;
+  }
+  glUniformBlockBinding(shader.ID, blocIndex, bindingPoint);
+};
+
+GLuint genUbo(GLuint dataSizeBytes) {
+  GLuint UBO;
+  glGenBuffers(1, &UBO);
+  glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+  glBufferData(GL_UNIFORM_BUFFER, dataSizeBytes, NULL, GL_DYNAMIC_DRAW);
+  glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+  return UBO;
+}
+
+void UboBlocBinding(GLuint UBO, GLuint dataSizeBytes, GLuint bindingPoint) {
+
+  glBindBufferRange(GL_UNIFORM_BUFFER, bindingPoint, UBO, 0, dataSizeBytes);
 }
