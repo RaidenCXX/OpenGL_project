@@ -5,7 +5,6 @@
 #include "enums.h"
 #include "glew/glew.h"
 #include "glfw/glfw3.h"
-#include "glm/detail/qualifier.hpp"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
@@ -274,6 +273,7 @@ int main() {
   glfwSetFramebufferSizeCallback(App.m_Window, framebuffer_size_callback);
   glfwSetWindowSizeCallback(App.m_Window, window_size_callback);
 
+  Shader VizNormalShader("normal");
   Shader RefractionShader("refraction");
   Shader MirrorShader("mirror");
   Shader CubeMapShader("cubemap");
@@ -424,6 +424,23 @@ int main() {
       ObjectShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
                                           App.m_Camera.getView() * model))));
       modelBall.Draw(ObjectShader);
+      if (true) {
+        // Normals visualization {
+        // Matrix
+        VizNormalShader.use();
+        model = glm::mat4(1.0f);
+        {
+          float angle = time * 7;
+          model = glm::rotate(model, glm::radians(angle),
+                              glm::vec3{0.0f, 1.0f, 0.0f});
+        }
+        VizNormalShader.setMat4("model", model);
+        VizNormalShader.setMat3(
+            "inverse", glm::mat3(glm::transpose(
+                           glm::inverse(App.m_Camera.getView() * model))));
+        modelBall.Draw(VizNormalShader);
+        // Normals visualization }
+      }
       // Ball model }
 
       // Ball outLine model {

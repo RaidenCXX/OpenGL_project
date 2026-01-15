@@ -1,0 +1,9 @@
+
+#version 330 core
+
+out vec4 FragColor;
+
+void main()
+{
+  FragColor = vec4(0.3, 0.82, 0.17, 1.0);
+}
