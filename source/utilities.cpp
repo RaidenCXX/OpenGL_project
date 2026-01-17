@@ -7,7 +7,9 @@
 #include "stb/stb_image.h"
 #include "utilities.h"
 
-GLuint loadCubemap(const std::string &cubmapName) {
+GLuint loadCubemap(const std::string &cubmapName, bool flip) {
+
+  stbi_set_flip_vertically_on_load(flip);
 
   std::vector<std::string> faces = {
       std::string{"/posx.jpg"}, //
@@ -22,7 +24,7 @@ GLuint loadCubemap(const std::string &cubmapName) {
   glGenTextures(1, &textureID);
   glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 
-  GLint width, height, nrChannels;
+  GLint width = 0, height = 0, nrChannels = 3;
   for (unsigned int i = 0; i < faces.size(); ++i) {
     unsigned char *data =
         stbi_load(("assets/cubemaps/" + cubmapName + faces[i]).c_str(), &width,
@@ -32,7 +34,9 @@ GLuint loadCubemap(const std::string &cubmapName) {
                    0, GL_RGB, GL_UNSIGNED_BYTE, data);
       stbi_image_free(data);
     } else {
-      std::cout << "Cubemap failed to load at path: " << faces[i] << std::endl;
+      std::cout << "Cubemap failed to load at path: "
+                << ("assets/cubemaps/" + cubmapName + faces[i]).c_str()
+                << std::endl;
       stbi_image_free(data);
     }
   }

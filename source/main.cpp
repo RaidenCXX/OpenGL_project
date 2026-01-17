@@ -21,6 +21,7 @@
 
 #include <cstddef>
 #include <map>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -273,6 +274,7 @@ int main() {
   glfwSetFramebufferSizeCallback(App.m_Window, framebuffer_size_callback);
   glfwSetWindowSizeCallback(App.m_Window, window_size_callback);
 
+  Shader InstanceShader("instance");
   Shader VizNormalShader("normal");
   Shader RefractionShader("refraction");
   Shader MirrorShader("mirror");
@@ -313,6 +315,8 @@ int main() {
 
   Model modelWindow{"assets/window/window.obj"};
 
+  Model modelPlandet{"assets/planet/planet.obj", true};
+
   glBindVertexArray(0);
 
   // Projection matrix
@@ -329,11 +333,11 @@ int main() {
   OffscreenFBO framebufer;
 
   // Load cubmap
-  GLuint CubemapTex = loadCubemap("LancellottiChapel");
+  GLuint CubemapTex = loadCubemap("Skybox");
   GLuint CubemapVAO = createCubMapVAO();
 
   GLuint matrixUbo = genUbo(sizeof(glm::mat4) * 2);
-  UboBlocBinding(matrixUbo, sizeof(glm::mat4) * 2, 0);
+  UboBlocBinding(matrixUbo, sizeof(glm::mat3) * 2, 0);
 
   ShaderBlockBinding(matrixUbo, ObjectShader, "Matrices", 0);
   ShaderBlockBinding(matrixUbo, OutLineShader, "Matrices", 0);
@@ -341,10 +345,82 @@ int main() {
   ShaderBlockBinding(matrixUbo, GlassShader, "Matrices", 0);
   ShaderBlockBinding(matrixUbo, RefractionShader, "Matrices", 0);
   ShaderBlockBinding(matrixUbo, MirrorShader, "Matrices", 0);
+  ShaderBlockBinding(matrixUbo, InstanceShader, "Matrices", 0);
+
+  // instance object {
+  int instanceCount = 30000;
+  float radius = 1.7f;
+
+  std::mt19937 engine(std::random_device{}());
+
+  std::uniform_real_distribution<float> offsetDist(-0.3f, 0.3f);
+  std::uniform_real_distribution<float> scaleDist(0.02f, 0.05f);
+  std::uniform_real_distribution<float> rotDist(0.0f, glm::two_pi<float>());
+
+  std::vector<glm::mat4> modelMatrices(instanceCount);
+  std::vector<glm::mat3> normalMatrices(instanceCount);
+
+  for (unsigned int i = 0; i < instanceCount; ++i) {
+    glm::mat4 model(1.0f);
+
+    float angle = (float)i / instanceCount * glm::two_pi<float>();
+
+    float x = sin(angle) * radius + offsetDist(engine);
+    float y = offsetDist(engine) * 0.2f;
+    float z = cos(angle) * radius + offsetDist(engine);
+
+    model = glm::translate(model, {x - 5.0f, y + 1.0f, z});
+
+    float scale = scaleDist(engine);
+    model = glm::scale(model, glm::vec3(scale));
+
+    float rotAngle = rotDist(engine);
+    model = glm::rotate(model, rotAngle,
+                        glm::normalize(glm::vec3(0.3f, 0.6f, 0.8f)));
+
+    modelMatrices[i] = model;
+    normalMatrices[i] = glm::transpose(
+        glm::inverse(glm::mat3{App.m_Camera.getView() * modelMatrices[i]}));
+  }
+
+  Model modelAsteroid{"assets/asteroid/asteroid.obj", true};
+
+  Mesh &asteroidMesh = modelAsteroid.getMesh(0);
+
+  GLuint asteroidVBO, asteroidNormalVBO;
+  glGenBuffers(1, &asteroidVBO);
+  glGenBuffers(1, &asteroidNormalVBO);
+
+  glBindVertexArray(asteroidMesh.getVAO());
+  glBindBuffer(GL_ARRAY_BUFFER, asteroidVBO);
+  glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4),
+               modelMatrices.data(), GL_STATIC_DRAW);
+
+  // instance attributes
+
+  for (int i = 0; i < 4; ++i) {
+    glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4),
+                          (void *)(i * sizeof(glm::vec4)));
+    glEnableVertexAttribArray(3 + i);
+    glVertexAttribDivisor(3 + i, 1);
+  }
+
+  glBindBuffer(GL_ARRAY_BUFFER, asteroidNormalVBO);
+  glBufferData(GL_ARRAY_BUFFER, normalMatrices.size() * sizeof(glm::mat3),
+               normalMatrices.data(), GL_DYNAMIC_DRAW);
+
+  for (int i = 0; i < 3; ++i) {
+    glVertexAttribPointer(7 + i, 3, GL_FLOAT, GL_FALSE, sizeof(glm::mat3),
+                          (void *)(i * sizeof(glm::vec3)));
+    glEnableVertexAttribArray(7 + i);
+    glVertexAttribDivisor(7 + i, 1);
+  }
+
+  glBindVertexArray(0);
+  // instance object }
 
   glm::mat4 model;
   while (!glfwWindowShouldClose(App.m_Window)) {
-
     updateUbo(matrixUbo, 0, projection);
     updateUbo(matrixUbo, sizeof(glm::mat4), App.m_Camera.getView());
 
@@ -352,7 +428,7 @@ int main() {
 
     App.update();
     float aspect = (float)App.m_FbWidth / (float)App.m_FbHight;
-    projection = glm::perspective(glm::radians(45.f), aspect, 0.1f, 40.f);
+    projection = glm::perspective(glm::radians(45.f), aspect, 0.1f, 200.f);
 
     // input
     processInput(App);
@@ -372,6 +448,122 @@ int main() {
     model = glm::mat4{1.0f};
 
     if (!App.m_Camera.getDepthModeStatus()) {
+
+      // Asteroids models{
+      glEnable(GL_CULL_FACE);
+      glCullFace(GL_BACK);
+      glFrontFace(GL_CCW);
+
+      InstanceShader.use();
+      InstanceShader.setVec3("dirLight.direction",
+                             glm::vec3(App.m_Camera.getView() *
+                                       glm::vec4(0.0f, -1.0f, 0.0f, 0.0f)));
+      InstanceShader.setVec3("dirLight.ambient", glm::vec3(0.1f, 0.1f, 0.1f));
+      InstanceShader.setVec3("dirLight.diffuse", glm::vec3(0.3f, 0.3f, 0.3f));
+      InstanceShader.setVec3("dirLight.specular", glm::vec3(0.3f, 0.3f, 0.3f));
+
+      // Pointlight properties
+      InstanceShader.setVec3(
+          "pointLight.position",
+          glm::vec3(App.m_Camera.getView() *
+                    glm::vec4(glm::vec3(0.0f, 2.0f, 0.0f), 1.0f)));
+
+      InstanceShader.setVec3("pointLight.ambient", glm::vec3(0.1f, 0.1f, 0.1f));
+      InstanceShader.setVec3("pointLight.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
+      InstanceShader.setVec3("pointLight.specular",
+                             glm::vec3(1.0f, 1.0f, 1.0f));
+      InstanceShader.setFloat("pointLight.constant", 1.0f);
+      InstanceShader.setFloat("pointLight.linear", 0.14f);
+      InstanceShader.setFloat("pointLight.quadratic", 0.07f);
+
+      // Flash light properties
+      InstanceShader.setVec3(
+          "flashLight.position",
+          glm::vec3(App.m_Camera.getView() *
+                    glm::vec4(App.m_Camera.getPosition(), 1.0f)));
+      InstanceShader.setVec3(
+          "flashLight.direction",
+          glm::vec3(App.m_Camera.getView() *
+                    glm::vec4(App.m_Camera.getFront(), 0.0f)));
+      InstanceShader.setVec3("flashLight.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
+      InstanceShader.setVec3("flashLight.specular",
+                             glm::vec3(1.0f, 1.0f, 1.0f));
+      InstanceShader.setFloat("flashLight.cutOff", cos(glm::radians(20.f)));
+      InstanceShader.setFloat("flashLight.outerCutOff",
+                              cos(glm::radians(13.f)));
+
+      glBindVertexArray(asteroidMesh.getVAO());
+      //
+      // for (int i = 0; i < instanceCount; ++i) {
+      //   normalMatrices[i] = glm::transpose(
+      //       glm::inverse(glm::mat3{App.m_Camera.getView() *
+      //       modelMatrices[i]}));
+      // }
+      // glBindBuffer(GL_ARRAY_BUFFER, asteroidNormalVBO);
+      // glBufferSubData(GL_ARRAY_BUFFER, 0,
+      //                 normalMatrices.size() * sizeof(glm::mat3),
+      //                 normalMatrices.data());
+
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, asteroidMesh.m_textures[0].id);
+      InstanceShader.setInt("material.texture_diffuse1", 0);
+      glActiveTexture(GL_TEXTURE0 + 1);
+      glBindTexture(GL_TEXTURE_2D, asteroidMesh.m_textures[1].id);
+      InstanceShader.setInt("material.texture_specular1", 1);
+      InstanceShader.setFloat("material.shininess", 64.f);
+
+      glDrawElementsInstanced(GL_TRIANGLES, asteroidMesh.m_indices.size(),
+                              GL_UNSIGNED_INT, 0, instanceCount);
+      // Asteroids models}
+
+      // Planet model {
+
+      ObjectShader.use();
+
+      ObjectShader.setVec3("dirLight.direction",
+                           glm::vec3(App.m_Camera.getView() *
+                                     glm::vec4(0.0f, -1.0f, 0.0f, 0.0f)));
+      ObjectShader.setVec3("dirLight.ambient", glm::vec3(0.1f, 0.1f, 0.1f));
+      ObjectShader.setVec3("dirLight.diffuse", glm::vec3(0.3f, 0.3f, 0.3f));
+      ObjectShader.setVec3("dirLight.specular", glm::vec3(0.3f, 0.3f, 0.3f));
+
+      // Pointlight properties
+      ObjectShader.setVec3(
+          "pointLight.position",
+          glm::vec3(App.m_Camera.getView() *
+                    glm::vec4(glm::vec3(0.0f, 2.0f, 0.0f), 1.0f)));
+
+      ObjectShader.setVec3("pointLight.ambient", glm::vec3(0.1f, 0.1f, 0.1f));
+      ObjectShader.setVec3("pointLight.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
+      ObjectShader.setVec3("pointLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+
+      // Flash light properties
+      ObjectShader.setVec3(
+          "flashLight.position",
+          glm::vec3(App.m_Camera.getView() *
+                    glm::vec4(App.m_Camera.getPosition(), 1.0f)));
+      ObjectShader.setVec3("flashLight.direction",
+                           glm::vec3(App.m_Camera.getView() *
+                                     glm::vec4(App.m_Camera.getFront(), 0.0f)));
+      ObjectShader.setVec3("flashLight.diffuse", glm::vec3(1.0f, 1.0f, 1.0f));
+      ObjectShader.setVec3("flashLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+      ObjectShader.setFloat("flashLight.cutOff", cos(glm::radians(20.f)));
+      ObjectShader.setFloat("flashLight.outerCutOff", cos(glm::radians(13.f)));
+
+      // Matrix
+      model = glm::mat4(1.0f);
+      {
+        model = glm::translate(model, glm::vec3{-5.f, 1.0f, 0.0f});
+
+        float angle = time * 7;
+        model = glm::rotate(model, glm::radians(angle),
+                            glm::vec3{0.0f, 1.0f, 0.0f});
+      }
+      ObjectShader.setMat4("model", model);
+      ObjectShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
+                                          App.m_Camera.getView() * model))));
+      modelPlandet.Draw(ObjectShader);
+      // Planet model }
 
       // Ball model {
       glEnable(GL_DEPTH_TEST);
@@ -424,7 +616,7 @@ int main() {
       ObjectShader.setMat3("inverse", glm::mat3(glm::transpose(glm::inverse(
                                           App.m_Camera.getView() * model))));
       modelBall.Draw(ObjectShader);
-      if (true) {
+      if (false) {
         // Normals visualization {
         // Matrix
         VizNormalShader.use();

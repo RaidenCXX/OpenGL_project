@@ -36,6 +36,8 @@ public:
        std::vector<Texture> &texture);
   void Draw(Shader &shader, bool drawTexture);
 
+  GLuint &getVAO() { return m_VAO; }
+
 private:
   GLuint m_VAO, m_VBO, m_EBO;
   void setupMesh();
@@ -43,11 +45,14 @@ private:
 
 class Model {
 public:
-  Model(const char *path, bool flipTexture = false, bool gamma = false);
+  Model(const char *path, bool flipTexture = false, bool gamma = false,
+        bool instance = false);
+
   void Draw(Shader &shader, bool drawTexture = true);
 
   const std::vector<Texture> &getTextures() const { return m_textures_loaded; }
   const std::vector<Mesh> &getMeshes() const { return m_meshes; }
+  Mesh &getMesh(unsigned int index);
 
 private:
   // model data
@@ -56,6 +61,7 @@ private:
   std::string m_directory;
 
   // model setting
+  bool m_instance;
   bool m_flipTexture;
   bool m_alpha;
 

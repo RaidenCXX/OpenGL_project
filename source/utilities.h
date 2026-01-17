@@ -7,7 +7,7 @@
 #include "shader.h"
 #include <string>
 
-GLuint loadCubemap(const std::string &cubmapName);
+GLuint loadCubemap(const std::string &cubmapName, bool flip = false);
 GLuint createCubMapVAO();
 
 void ShaderBlockBinding(GLuint UBO, const Shader &shader,

@@ -88,8 +88,8 @@ void Mesh::Draw(Shader &shader, bool drawTexture) {
   // glActiveTexture(GL_TEXTURE0);
 }
 
-Model::Model(const char *path, bool flipTexture, bool gamma)
-    : m_flipTexture(flipTexture) {
+Model::Model(const char *path, bool flipTexture, bool gamma, bool instance)
+    : m_flipTexture(flipTexture), m_instance(instance) {
   loadModel(path);
 }
 
@@ -261,4 +261,12 @@ unsigned int Model::TextureFromFile(const char *path,
   }
 
   return textureID;
+}
+Mesh &Model::getMesh(unsigned int index) {
+
+  unsigned int size = m_meshes.size();
+  if (index > size)
+    index = 0;
+
+  return m_meshes[index];
 }
